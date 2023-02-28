@@ -1,8 +1,11 @@
 import gym
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+
+import plotly.express as px
+from Tools import *
+
+from gym.spaces import Space
 
 class EnvManager:
     # instance = None
@@ -12,22 +15,25 @@ class EnvManager:
     #         return EnvManager.instance
             
 
-    def __init__(self, env_name):
-        self.env : gym.Env = gym.make(env_name, render_mode="ansi", max_episode_steps = 200, is_slippery=False)
+    def __init__(self, env_name, **kargs):
+        self.env : gym.Env = gym.make(env_name, render_mode="ansi", **kargs)
         self.P = self.env.P
-        self.n_obs_space = self.env.observation_space.n
-        self.n_action_space = self.env.action_space.n
+        self.obs_space: Space = self.env.observation_space
+        self.action_space: Space = self.env.action_space
 
-        self.cm_rewards = np.zeros((self.env.observation_space.n, self.env.observation_space.n))
-        self.action_matrix = pd.DataFrame([['']*self.env.observation_space.n]*self.env.observation_space.n)
+        """Adjency matrix of rewards"""
+        self.cm_rewards = np.zeros((self.obs_space.n, self.obs_space.n))
        
-        for state in range(self.action_matrix.shape[0]):
+        """Text to display on top of adjency matrix"""
+        self.hover_matrix = pd.DataFrame([f'current_state: {i} \n next_state: {j} \n actions: ' for i in range(self.obs_space.n)] for j in range(self.obs_space.n))
+       
+        for state in range(self.hover_matrix.shape[0]):
             for action in list(self.env.P[state].keys())[::-1]:
                 for p, next_state, reward, done in self.env.P[state][action]:
-                    self.action_matrix.loc[state, next_state] += str(action)
+                    self.hover_matrix.loc[state, next_state] += f'{action}'
                     reward = -1 if done and reward < 1 else reward
                     self.cm_rewards[state, next_state] = reward
-        self.action_matrix = self.action_matrix.replace({'': '-1'}).astype(int)
+        self.hover_matrix = self.hover_matrix
     
     def render(self):
         return self.env.render()
@@ -36,11 +42,11 @@ class EnvManager:
         return self.env.reset()
     def step(self, action):
         return self.env.step(action)
-    def cm_rewards_heatmap(self):
-        plt.figure()
-        sns.heatmap(
-            self.cm_rewards,
-            annot = self.action_matrix
-        )
-        plt.show()
 
+
+    def cm_rewards_heatmap(self) -> Figure:
+        return Tools.heatmap_fig(
+            z = self.cm_rewards, 
+            hover_text=self.hover_matrix,
+            title = "Reward adjency matrix"
+        )
