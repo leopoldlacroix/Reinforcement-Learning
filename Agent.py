@@ -1,15 +1,48 @@
 import plotly.express as px
 import numpy as np
 from gym.spaces import Space
+from tensorflow.keras import Sequetial
+from tensorflow.keras.leayers import Input, Dense
 class Agent:
-    def __init__(self, learning_rate, discount_factor, exploration_rate, action_space:Space, observation_space: Space, state=None):
-        self._q_table:np.ndarray = np.zeros((observation_space.n, action_space.n))
-        self.lr = learning_rate
-        self.er = exploration_rate
-        self.df = discount_factor
+    def __init__(
+            self,
+            action_space:Space,
+            observation_space: Space,
+            learning_rate = 1e-3,  
+            discount_factor = 0.995,
+            num_steps_for_update = 4,
+            memory_size = 100_000,
+            state=None
+        ):
+        self.learning_rate = learning_rate
+        self.num_steps_for_update = num_steps_for_update
+        self.discount_factor = discount_factor
         self.current_state = state
         self.last_action = None
         self.action_space = action_space
+        self.memory_size = memory_size
+
+        # Create the Q-Network
+        q_network = tf. Sequential([
+            ### START CODE HERE ### 
+            Input(shape=(observation_space.n)),
+            Dense(units=64, activation="relu"),
+            Dense(units=64, activation="relu"),
+            Dense(units=action_space.n, activation="linear"),
+            
+            ### END CODE HERE ### 
+            ])
+
+        # Create the target Q^-Network
+        target_q_network = Sequential([
+            ### START CODE HERE ### 
+            Input(shape=(observation_space.n)),
+            Dense(units=64, activation="relu"),
+            Dense(units=64, activation="relu"),
+            Dense(units=action_space.n, activation="linear"),
+        
+            ### END CODE HERE ###
+            ])
     
     def set_state(self, state):
         self.current_state = state
