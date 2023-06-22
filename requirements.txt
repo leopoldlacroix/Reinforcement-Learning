@@ -1,4 +1,8 @@
 jupyterlab
-pyplot
+plotly
 numpy
 tensorflow
+wheel
+swig
+Pillow
+gymnasium[box2d]
