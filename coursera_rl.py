@@ -7,8 +7,11 @@ import numpy as np
 import tensorflow as tf
 import random
 
-
 # %%
+
+ref_state = np.array([[-0.005756  ,  1.402744  , -0.58303285, -0.36339095,  0.00667652,
+    0.13206567,  0.        ,  0.        ],])
+
 SEED = 0  # Seed for the pseudo-random number generator.
 MINIBATCH_SIZE = 64  # Mini-batch size.
 TAU = 1e-3  # Soft update parameter.
@@ -19,6 +22,10 @@ MEMORY_SIZE = 100_000     # size of memory buffer
 GAMMA = 0.995             # discount factor
 ALPHA = 1e-3              # learning rate  
 NUM_STEPS_FOR_UPDATE = 4  # perform a learning update every C time steps
+
+random.seed(SEED)
+tf.random.set_seed(SEED)
+
 
 env = gym.make('LunarLander-v2')
 state_size = env.observation_space.shape
@@ -110,7 +117,7 @@ def update_target_network(q_network, target_q_network):
     ):
         target_weights.assign(TAU * q_net_weights + (1.0 - TAU) * target_weights)
 
-@tf.function
+# @tf.function
 def agent_learn(experiences, gamma):
 
     with tf.GradientTape() as tape:
@@ -135,7 +142,7 @@ def get_action(q_values, epsilon=0.0):
 # %%
 start = time.time()
 
-num_episodes = 2000
+num_episodes = 20
 max_num_timesteps = 1000
 
 total_point_history = []
@@ -183,10 +190,12 @@ for i in range(num_episodes):
     
     epsilon = get_new_epsilon(epsilon)
 
-    print(f"\rEpisode {i+1} | Last {num_p_av} episodes: av_latest_points {av_latest_points:.2f}, av_frame_count : {av_frame_count}", end = '')
+    ref_pred: tf.Tensor = q_network(ref_state)
+    ref_pred = "("+",".join(ref_pred.numpy()[0].astype(dtype=str))+")"
+    print(f"\rEpisode {i+1} | last {num_p_av} episodes: {av_latest_points=:f} ,{av_frame_count=:.2f} ,{epsilon=:2f} ,{ref_pred}", end = "")
 
     if (i+1) % num_p_av == 0:
-        print(f"\rEpisode {i+1} | Last {num_p_av} episodes: av_latest_points {av_latest_points:.2f}, av_frame_count : {av_frame_count}")
+        print(f"Episode {i+1} | last {num_p_av} episodes: {av_latest_points=:f} ,{av_frame_count=:.2f} ,{epsilon=:2f},{ref_pred}")
 
     if av_latest_points >= 200.0:
         print(f"\n\nEnvironment solved in {i+1} episodes!")

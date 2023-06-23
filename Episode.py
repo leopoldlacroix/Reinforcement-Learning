@@ -8,7 +8,7 @@ from gymnasium.wrappers.time_limit import TimeLimit
 import time
 
 class Episode:
-    def serie(env, agent: Agent, nb_ep, isTrain = True, print_info_every = 100, max_nbr_frame = 1000):
+    def serie(env, agent: Agent, nb_ep, isTrain = True, print_info_every = 20, max_nbr_frame = 1000):
         start = time.time()
         scores: deque[float] = deque(maxlen = 1000)
         frame_counts: deque[float] = deque(maxlen = 1000)
@@ -19,9 +19,11 @@ class Episode:
 
             av_frames = np.mean(list(frame_counts)[-print_info_every:])
             av_scores = np.mean(list(scores)[-print_info_every:])
-            print(f"\rEpisode {ep_i} | last {print_info_every} episodes (av_score: {av_scores:.2f}, av_frames: {av_frames:.2f}", end = "")
+            ref_pred = agent.q_network(Agent.ref_state)
+            ref_pred = "("+",".join(ref_pred.numpy()[0].astype(dtype=str))+")"
+            print(f"\rEpisode {ep_i} | last {print_info_every} episodes: {av_scores=:f}, {av_frames=:.2f}, {agent.epsilon=:2f},{ref_pred}", end = "")
             if (ep_i) % print_info_every == 0:
-                print(f"\rEpisode {ep_i} | last {print_info_every} episodes (av_score: {av_scores:.2f}, av_frames: {av_frames:.2f}")
+                print(f"\rEpisode {ep_i} | last {print_info_every} episodes: {av_scores=:f} ,{av_frames=:.2f} ,{agent.epsilon=:2f},{ref_pred}", end = "\n")
                 print(f'elapsed {time.time() - start}')
             
             agent.update_epsilon()
@@ -30,7 +32,7 @@ class Episode:
         print(f'Serie finished, elapsed {end - start}\n')
         return scores
     
-    def __init__(self, env: TimeLimit, agent: Agent, isTrain = True, max_nbr_frame = 1000: int):
+    def __init__(self, env: TimeLimit, agent: Agent, isTrain: bool = True, max_nbr_frame: int = 1000):
         self.env = env
         # self.isTrain: bool = isTrain
         # self.frames: list[Agent.experience] = []

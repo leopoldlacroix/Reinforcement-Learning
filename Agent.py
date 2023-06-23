@@ -5,10 +5,16 @@ import numpy as np
 from gymnasium.spaces.discrete import Discrete
 import tensorflow as tf
 import random
+
+
+SEED = 0
+random.seed(SEED)
+tf.random.set_seed(SEED)
+
+
 # %%
-ref_state = np.array([-0.005756  ,  1.402744  , -0.58303285, -0.36339095,  0.00667652,
-    0.13206567,  0.        ,  0.        ])
 class Agent:
+    ref_state = np.array([[-0.005756  ,  1.402744  , -0.58303285, -0.36339095,  0.00667652, 0.13206567,  0.        ,  0.        ],])
     experience = namedtuple("Experience", field_names=["state", "action", "reward", "next_state", "done", "truncated", "isExploration", "render"])
     """fields: state, action, reward, next_state, done, truncated, isExploration, render"""
     min_batch_size = 64
@@ -65,31 +71,48 @@ class Agent:
         # print(self.epsilon)
         self.epsilon = max(self.e_min, self.e_decay* self.epsilon)
     
+    def get_experiences(memory_buffer):
+
+        experiences:list[Agent.experience] = random.sample(memory_buffer, k=Agent.min_batch_size)
+        states = tf.convert_to_tensor(
+            np.array([e.state for e in experiences if e is not None]), dtype=tf.float32
+        )
+        actions = tf.convert_to_tensor(
+            np.array([e.action for e in experiences if e is not None]), dtype=tf.float32
+        )
+        rewards = tf.convert_to_tensor(
+            np.array([e.reward for e in experiences if e is not None]), dtype=tf.float32
+        )
+        next_states = tf.convert_to_tensor(
+            np.array([e.next_state for e in experiences if e is not None]), dtype=tf.float32
+        )
+        done_vals = tf.convert_to_tensor(
+            np.array([e.done for e in experiences if e is not None]).astype(np.uint8),
+            dtype=tf.float32,
+        )
+        return (states, actions, rewards, next_states, done_vals)
+
     def action_and_learn(self, state: np.ndarray, isTrain: bool)-> tuple[bool, int]:
         self.network_update_counter +=1
 
         do_training = (self.network_update_counter%self.update_network_every == 0) and len(self.experience_memory) > Agent.min_batch_size and isTrain
         if do_training:
             # self.epsilon_update_counter +=1
-            experiences = random.sample(self.experience_memory, k=64)
-            states, actions, rewards, next_states, dones, truncateds, isExplorations, renders = map(
-                lambda l: tf.convert_to_tensor(np.array([*l]), dtype = tf.float32),
-                np.array(experiences, dtype=object).T
-            )
-            experiences = (states, actions, rewards, next_states, dones)
+            # experiences = random.sample(self.experience_memory, k=Agent.min_batch_size)
+            # states, actions, rewards, next_states, dones, truncateds, isExplorations, renders = map(
+            #     lambda l: tf.convert_to_tensor(np.array([*l]), dtype = tf.float32),
+            #     np.array(experiences, dtype=object).T
+            # )
+            experiences = Agent.get_experiences(self.experience_memory)
             self.agent_learn(experiences, self.discount_factor)
 
-        # if self.epsilon_update_counter%self.update_epsilon_every == 0:
-        #     # print('epsilon')
-        #     self.epsilon_update_counter=1
-        #     self.update_epsilon()
-
-        if np.random.random() < self.epsilon:
-            return True, np.random.randint(self.num_actions)
+        if np.random.random() > self.epsilon:
+            q_values = self.q_network(np.array([state,]))
+            return False, np.argmax(q_values)
+            
+        return True, random.choice(range(self.num_actions))
         
                
-        q_values = self.q_network(np.array([state,]))
-        return False, np.argmax(q_values)
     
 
     def append_experience(self, exp: experience):
@@ -110,13 +133,13 @@ class Agent:
         
         return loss
 
-    def _target_network_soft_update(self):
+    def _target_network_soft_update(self, target_q_network: tf.keras.Sequential, q_network:tf.keras.Sequential):
         for target_weights, q_net_weights in zip(
             self.target_q_network.weights, self.q_network.weights
         ):
             target_weights.assign(self.t_soft_update * q_net_weights + (1.0 - self.t_soft_update) * target_weights)
         
-    @tf.function
+    # @tf.function
     def agent_learn(self, experiences, gamma):
         # print("Updating network")
         with tf.GradientTape() as tape:
@@ -124,12 +147,9 @@ class Agent:
 
         # Get the gradients of the loss with respect to the weights.
         gradients = tape.gradient(loss, self.q_network.trainable_variables)
-        
-        # Update the weights of the q_network.
         self.optimizer.apply_gradients(zip(gradients, self.q_network.trainable_variables))
-
-        # update the weights of target q_network
-        self._target_network_soft_update()
+        self._target_network_soft_update(self.q_network, self.target_q_network)
 
     def __repr__(self) -> str:
         return self.__
+# %%
