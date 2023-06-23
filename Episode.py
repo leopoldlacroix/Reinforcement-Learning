@@ -2,59 +2,64 @@ import numpy as np
 from Agent import Agent
 from IPython.display import clear_output
 from time import sleep
+from collections import deque
 
 from gymnasium.wrappers.time_limit import TimeLimit
 import time
 
 class Episode:
-    def serie(env, agent, nb_ep, isTrain = True, print_info_every = 25, max_nbr_frame = 500):
+    def serie(env, agent: Agent, nb_ep, isTrain = True, print_info_every = 100, max_nbr_frame = 1000):
         start = time.time()
-        episodes: list[Episode] = []
-        for ep in range(nb_ep):
-            episodes.append(Episode(env, agent, isTrain))
+        scores: deque[float] = deque(maxlen = 1000)
+        frame_counts: deque[float] = deque(maxlen = 1000)
+        for ep_i in range(nb_ep):
+            ep_o = Episode(env, agent, isTrain, max_nbr_frame)
+            scores.append(ep_o.score)
+            frame_counts.append(ep_o.frame_count)
 
-            if ep % print_info_every == 0:
-                av_scores = np.mean([
-                    ep.score for ep in episodes[-print_info_every:]
-                ])
-                print(
-                    f"episode {ep}:",
-                    # f"truncated: {episodes[-1].truncated}",
-                    # f"done: {episodes[-1].done}",
-                    f"average score on last {print_info_every} eps: {av_scores}\n",
-                    sep='\n'
-                )
+            av_frames = np.mean(list(frame_counts)[-print_info_every:])
+            av_scores = np.mean(list(scores)[-print_info_every:])
+            print(f"\rEpisode {ep_i} | last {print_info_every} episodes (av_score: {av_scores:.2f}, av_frames: {av_frames:.2f}", end = "")
+            if (ep_i) % print_info_every == 0:
+                print(f"\rEpisode {ep_i} | last {print_info_every} episodes (av_score: {av_scores:.2f}, av_frames: {av_frames:.2f}")
                 print(f'elapsed {time.time() - start}')
+            
+            agent.update_epsilon()
 
         end = time.time()
         print(f'Serie finished, elapsed {end - start}\n')
-        return episodes
-
-    def __init__(self, env: TimeLimit, agent: Agent, isTrain = True):
+        return scores
+    
+    def __init__(self, env: TimeLimit, agent: Agent, isTrain = True, max_nbr_frame = 1000: int):
         self.env = env
-        self.isTrain: bool = isTrain
-        self.frames: list[Agent.experience] = []
+        # self.isTrain: bool = isTrain
+        # self.frames: list[Agent.experience] = []
+        rewards: list[float] = []
         state, info = self.env.reset()
         
         done, truncated, reward, action = False, False, 0, 0
         
+        # self.frames.append(Agent.experience(state, action, reward, None, done, truncated, False, env.render()))
         
-        self.frames.append(Agent.experience(state, action, reward, None, done, truncated, False, env.render()))
-
-        while not (done or truncated):
+        for frame_i in range(max_nbr_frame):
+            if done or truncated:
+                break
             isExploration, action = agent.action_and_learn(state = state, isTrain = isTrain)
             next_state, reward, done, truncated, info = self.env.step(action)
 
-            frame = Agent.experience(state, action, reward, next_state, done, truncated, isExploration, env.render())
+            frame = Agent.experience(state, action, reward, next_state, done, truncated, isExploration, None)
+            # frame = Agent.experience(state, action, reward, next_state, done, truncated, isExploration, env.render())
             
             agent.append_experience(frame)
-            self.frames.append(frame)
+            # self.frames.append(frame)
+            rewards.append(reward)
             state = next_state
 
-        
+        self.frame_count = frame_i
         self.done = done
         self.truncated = truncated
-        self.score = np.mean([frame.reward for frame in self.frames])
+        # self.score = np.mean([frame.reward for frame in self.frames])
+        self.score = np.sum(rewards)
     
     # def get_hist_df(self): 
     #     return pd.DataFrame(
