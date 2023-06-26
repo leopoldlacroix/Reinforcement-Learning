@@ -8,12 +8,12 @@ from gymnasium.wrappers.time_limit import TimeLimit
 import time
 
 class Episode:
-    def serie(env, agent: Agent, nb_ep, isTrain = True, print_info_every = 20, max_nbr_frame = 1000):
+    def serie(env, agent: Agent, nb_ep, is_train = True, print_info_every = 20, max_nbr_frame = 1000):
         start = time.time()
-        scores: deque[float] = deque(maxlen = 1000)
+        scores: list[float] = list()
         frame_counts: deque[float] = deque(maxlen = 1000)
         for ep_i in range(nb_ep):
-            ep_o = Episode(env, agent, isTrain, max_nbr_frame)
+            ep_o = Episode(env, agent, is_train, max_nbr_frame)
             scores.append(ep_o.score)
             frame_counts.append(ep_o.frame_count)
 
@@ -32,9 +32,9 @@ class Episode:
         print(f'Serie finished, elapsed {end - start}\n')
         return scores
     
-    def __init__(self, env: TimeLimit, agent: Agent, isTrain: bool = True, max_nbr_frame: int = 1000):
+    def __init__(self, env: TimeLimit, agent: Agent, is_train: bool = True, max_nbr_frame: int = 1000):
         self.env = env
-        # self.isTrain: bool = isTrain
+        # self.is_train: bool = is_train
         # self.frames: list[Agent.experience] = []
         rewards: list[float] = []
         state, info = self.env.reset()
@@ -46,16 +46,18 @@ class Episode:
         for frame_i in range(max_nbr_frame):
             if done or truncated:
                 break
-            isExploration, action = agent.action_and_learn(state = state, isTrain = isTrain)
+
+            isExploration, action = agent.action(state = state)
             next_state, reward, done, truncated, info = self.env.step(action)
 
             frame = Agent.experience(state, action, reward, next_state, done, truncated, isExploration, None)
             # frame = Agent.experience(state, action, reward, next_state, done, truncated, isExploration, env.render())
             
             agent.append_experience(frame)
+            agent.learn(is_train)
             # self.frames.append(frame)
             rewards.append(reward)
-            state = next_state
+            state = next_state.copy()
 
         self.frame_count = frame_i
         self.done = done

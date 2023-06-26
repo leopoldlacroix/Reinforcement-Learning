@@ -42,27 +42,20 @@ def get_action(q_values, epsilon=0.0):
 
 # %%
 q_network = tf.keras.Sequential([
-    ### START CODE HERE ### 
     tf.keras.layers.Input(shape=(state_size)),
     tf.keras.layers.Dense(units=64, activation="relu"),
     tf.keras.layers.Dense(units=64, activation="relu"),
-    tf.keras.layers.Dense(units=num_actions, activation="linear"),
-    
-    ### END CODE HERE ### 
-    ])
+    tf.keras.layers.Dense(units=num_actions, activation="linear"),    
+])
 
 # Create the target Q^-Network
 target_q_network = tf.keras.Sequential([
-    ### START CODE HERE ### 
     tf.keras.layers.Input(shape=(state_size)),
     tf.keras.layers.Dense(units=64, activation="relu"),
     tf.keras.layers.Dense(units=64, activation="relu"),
-    tf.keras.layers.Dense(units=num_actions, activation="linear"),
-   
-    ### END CODE HERE ###
-    ])
+    tf.keras.layers.Dense(units=num_actions, activation="linear"),   
+])
 
-### START CODE HERE ### 
 optimizer = tf.keras.optimizers.Adam(learning_rate=ALPHA)
 
 def check_update_conditions(t, num_steps_upd, memory_buffer):

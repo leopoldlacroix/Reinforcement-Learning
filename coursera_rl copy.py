@@ -7,7 +7,7 @@ import numpy as np
 import tensorflow as tf
 import random
 from Agent import * 
-# %%
+# %%<
 
 ref_state = np.array([[-0.005756  ,  1.402744  , -0.58303285, -0.36339095,  0.00667652,
     0.13206567,  0.        ,  0.        ],])
@@ -143,12 +143,18 @@ for i in range(num_episodes):
         
         next_state, reward, done, truncated, info = env.step(action)
         
-        memory_buffer.append(experience(state, action, reward, next_state, done))
-        
-        update = check_update_conditions(t, NUM_STEPS_FOR_UPDATE, memory_buffer)
-        
+        # memory_buffer.append(experience(state, action, reward, next_state, done))
+        agent.experience_memory.append(experience(state, action, reward, next_state, done))
+
+
+        update = check_update_conditions(t, NUM_STEPS_FOR_UPDATE, agent.experience_memory)
+        # update = check_update_conditions(t, NUM_STEPS_FOR_UPDATE, memory_buffer)
+        # assert update_a == update
+        # assert memory_buffer == agent.experience_memory
+
         if update:
-            experiences = get_experiences(memory_buffer)
+            experiences = Agent.get_experiences(agent.experience_memory)
+            # experiences = get_experiences(memory_buffer)
             
             agent.agent_learn(experiences, GAMMA)
             # agent.agent_learn(experiences, GAMMA)

@@ -26,7 +26,7 @@ class Agent:
             learning_rate = 1e-3,
             t_soft_update = 0.8,  
             discount_factor = 0.995,
-            memory_size = 1_000,
+            memory_size = 100_000,
             update_network_every = 4,
             update_epsilon_every = 60,
             e_decay = 0.995,
@@ -62,7 +62,7 @@ class Agent:
             tf.keras.layers.Dense(units=64, activation="relu"),
             tf.keras.layers.Dense(units=num_actions, activation="linear"),
             ])
-        
+                
         self.target_q_network.set_weights(self.q_network.get_weights())
         
         self.optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
@@ -92,11 +92,18 @@ class Agent:
         )
         return (states, actions, rewards, next_states, done_vals)
 
-    def action_and_learn(self, state: np.ndarray, isTrain: bool)-> tuple[bool, int]:
+    def action(self, state: np.ndarray)-> tuple[bool, int]:
         self.network_update_counter +=1
 
-        do_training = (self.network_update_counter%self.update_network_every == 0) and len(self.experience_memory) > Agent.min_batch_size and isTrain
-        if do_training:
+        if np.random.random() > self.epsilon:
+            q_values = self.q_network(np.array([state,]))
+            return False, np.argmax(q_values)
+            
+        return True, random.choice(range(self.num_actions))
+        
+    def learn(self, is_train: bool):
+        do_update = ((self.network_update_counter+1)%self.update_network_every == 0) and len(self.experience_memory) > Agent.min_batch_size and is_train
+        if do_update:
             # self.epsilon_update_counter +=1
             # experiences = random.sample(self.experience_memory, k=Agent.min_batch_size)
             # states, actions, rewards, next_states, dones, truncateds, isExplorations, renders = map(
@@ -105,50 +112,40 @@ class Agent:
             # )
             experiences = Agent.get_experiences(self.experience_memory)
             self.agent_learn(experiences, self.discount_factor)
-
-        if np.random.random() > self.epsilon:
-            q_values = self.q_network(np.array([state,]))
-            return False, np.argmax(q_values)
-            
-        return True, random.choice(range(self.num_actions))
-        
-               
     
 
     def append_experience(self, exp: experience):
         self.experience_memory.append(exp)
 
-    def compute_loss(self, experiences, gamma, q_network, target_q_network):
-        """gamma = discount factor"""
-        # Unpack the mini-batch of experience tuples
-        states, actions, rewards, next_states, dones = experiences
+    def compute_loss(experiences, gamma, q_network, target_q_network):
+        states, actions, rewards, next_states, done_vals = experiences
+
         max_qsa = tf.reduce_max(target_q_network(next_states), axis=-1)
-        y_targets = rewards + gamma * (1-dones)*max_qsa    
+        y_targets = rewards + gamma * (1-done_vals)*max_qsa
         
         q_values = q_network(states)
-        action_range_action_stack = tf.stack([tf.range(q_values.shape[0]),tf.cast(actions, tf.int32)], axis=1)
-        
-        q_values = tf.gather_nd(q_values, action_range_action_stack)
+        q_values = tf.gather_nd(q_values, tf.stack([tf.range(q_values.shape[0]),
+                                                    tf.cast(actions, tf.int32)], axis=1))
         loss = tf.reduce_mean((q_values - y_targets)**2)
         
         return loss
 
-    def _target_network_soft_update(self, target_q_network: tf.keras.Sequential, q_network:tf.keras.Sequential):
+    def update_target_network(self):
         for target_weights, q_net_weights in zip(
             self.target_q_network.weights, self.q_network.weights
         ):
             target_weights.assign(self.t_soft_update * q_net_weights + (1.0 - self.t_soft_update) * target_weights)
         
-    # @tf.function
+    @tf.function
     def agent_learn(self, experiences, gamma):
-        # print("Updating network")
-        with tf.GradientTape() as tape:
-            loss = self.compute_loss(experiences, gamma, self.q_network, self.target_q_network)
 
-        # Get the gradients of the loss with respect to the weights.
+        with tf.GradientTape() as tape:
+            loss = Agent.compute_loss(experiences, gamma, self.q_network, self.target_q_network)
+
         gradients = tape.gradient(loss, self.q_network.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, self.q_network.trainable_variables))
-        self._target_network_soft_update(self.q_network, self.target_q_network)
+        self.update_target_network()
+
 
     def __repr__(self) -> str:
         return self.__
